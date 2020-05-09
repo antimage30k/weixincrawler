@@ -105,12 +105,6 @@ class SQLModel(object):
             cls.connection.rollback()
 
     @classmethod
-    def select(cls, connection):
-        # SELECT * FROM user
-        sql_select = 'SELECT * FROM {}'.format(cls.table_name())
-        return Query(sql_select, connection, cls)
-
-    @classmethod
     def all(cls, **kwargs):
         # SELECT * FROM User WHERE username='xxx' AND password='xxx'
         sql_select = 'SELECT * FROM \n\t{}'.format(cls.table_name())
@@ -183,90 +177,6 @@ class SQLModel(object):
 
     def json(self):
         return self.__dict__
-
-
-class Query(object):
-    def __init__(self, raw, connection, model):
-        self.query = raw
-        self.values = tuple()
-        self.connection = connection
-        self.model = model
-
-    def where(self, table, column, value):
-        sql_where = '`{}`.{}=%s'.format(table, column)
-        if 'WHERE' in self.query:
-            sql_where = ' AND {}'.format(sql_where)
-        else:
-            sql_where = '\tWHERE\t{}'.format(sql_where)
-        self.query = '{}{}'.format(self.query, sql_where)
-        values = list(self.values)
-        values.append(value)
-        self.values = tuple(values)
-        return self
-
-        # def where(self, **kwargs):
-        #     if len(kwargs) > 0:
-        #         sql_where = ' AND '.join(
-        #             ['`{}`=%s'.format(k) for k in kwargs.keys()]
-        #         )
-        #         sql_where = '\tWHERE\t{}'.format(sql_where)
-        #         self.query = '{}{}'.format(self.query, sql_where)
-        #     log('ORM where <{}>'.format(self.query))
-        #
-        #     self.values = tuple(kwargs.values())
-        #
-        #     return self
-    def group_by(self, table, column):
-        sql_group = ' GROUP BY {}.{}'.format(table, column)
-        self.query = '{}{}'.format(self.query, sql_group)
-        return self
-
-    def all(self):
-        log('ORM all <{}> <{}>'.format(self.query, self.values))
-
-        ms = []
-        with self.connection.cursor() as cursor:
-            log('ORM execute all <{}>'.format(cursor.mogrify(self.query, self.values)))
-            cursor.execute(self.query, self.values)
-            result = cursor.fetchall()
-            for row in result:
-                if self.join_exist():
-                    m = row
-                else:
-                    m = self.model(row)
-                ms.append(m)
-            return ms
-
-    def one(self):
-        self.query = '{} LIMIT 1'.format(self.query)
-        log('ORM one <{}> <{}>'.format(self.query, self.values))
-
-        with self.connection.cursor() as cursor:
-            log('ORM execute one <{}>'.format(cursor.mogrify(self.query, self.values)))
-            cursor.execute(self.query, self.values)
-            result = cursor.fetchone()
-            if result is None:
-                return None
-            else:
-                if self.join_exist():
-                    return result
-                else:
-                    return self.model(result)
-
-    def join(self, target_model, field, target_field):
-        # JOIN topic on user.id=topic.user_id
-        target_table = target_model.table_name()
-        table = self.model.table_name()
-        sql_join = 'JOIN {} on {}.{}={}.{}'.format(
-            target_table, table, field, target_table, target_field
-        )
-        self.query = '{}\t{}'.format(self.query, sql_join)
-        # print('join query', self.query)
-        return self
-
-    def join_exist(self):
-        exist = 'JOIN' in self.query
-        return exist
 
 
 # Article类，用数据库存储爬到的文章的tag信息
